@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart AI Search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+      color: #333;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #007acc;
+      color: white;
+      padding: 1rem 2rem;
+    }
+    header img {
+      height: 50px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+    input[type="text"] {
+      width: 70%;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      padding: 12px 16px;
+      font-size: 16px;
+      margin: 10px 5px;
+      background-color: #007acc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #005c99;
+    }
+    select {
+      margin-top: 10px;
+      padding: 10px;
+      font-size: 15px;
+    }
+    #results a {
+      display: block;
+      margin: 0.5rem 0;
+      color: #007acc;
+      text-decoration: none;
+    }
+    #results a:hover {
+      text-decoration: underline;
+    }
+    #history ul {
+      padding-left: 1rem;
+    }
+    .dark-mode {
+      background-color: #121212;
+      color: #eee;
+    }
+    .dark-mode a {
+      color: #4ea8de;
+    }
+    .toggle-switch {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <img src="https://upload.wikimedia.org/wikipedia/commons/8/80/Artificial_Intelligence_logo.png" alt="Logo" />
+      <span style="font-size: 1.4rem; font-weight: bold;">Smart AI Search</span>
+    </div>
+    <button class="toggle-switch" onclick="toggleTheme()">🌓 Toggle Theme</button>
+  </header>
+  <div class="container">
+    <p>Ask anything. Use voice or text. Filter by category. Enjoy AI-enhanced results!</p>
+    <input type="text" id="queryInput" placeholder="e.g. How does GPT work?" />
+    <button onclick="search()">Search</button>
+    <button onclick="startVoice()">🎤 Voice</button>
+
+    <div>
+      <label for="categorySelect">Category:</label>
+      <select id="categorySelect">
+        <option value="">All</option>
+        <option value="news">News</option>
+        <option value="videos">Videos</option>
+        <option value="tutorials">Tutorials</option>
+      </select>
+    </div>
+
+    <div style="margin-top: 1.5rem;">
+      <button onclick="showTab('webTab')">🔗 Web</button>
+      <button onclick="showTab('imageTab')">🖼️ Images</button>
+      <button onclick="showTab('chatTab')">🤖 Chatbot</button>
+    </div>
+
+    <div id="webTab" class="tab-content tab-active">
+      <div id="results" style="margin-top: 2rem;"></div>
+    </div>
+    <div id="imageTab" class="tab-content">
+      <button onclick="searchImages()">Search Images</button>
+      <div id="imageResults" style="margin-top: 2rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;"></div>
+    </div>
+    <div id="chatTab" class="tab-content">
+      <h3>🤖 Ask the Chatbot</h3>
+      <textarea id="chatInput" placeholder="Ask a question..." rows="3" style="width:100%;"></textarea>
+      <button onclick="askChat()">Ask</button>
+      <div id="chatResponse" style="margin-top:1rem;"></div>
+    </div>
+
+    <div id="history" style="margin-top: 2rem;">
+      <h3>🔁 Search History</h3>
+      <button onclick="clearHistory()">Clear History</button>
+      <ul id="historyList"></ul>
+    </div>
+  </div>
+
+  <script>
+    const openAiKey = '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';
+    const unsplashAccessKey = 'L5b6OPOy-0oD_sKs0lYCQSRc7XGybK5Ssp6aApiBj3k';
+
+    function showTab(id) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('tab-active'));
+      document.getElementById(id).classList.add('tab-active');
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("dark-mode");
+    }
+
+    window.onload = () => {
+      showHistory();
+    };
+
+    function saveToHistory(query) {
+      let history = JSON.parse(localStorage.getItem("searchHistory")) || [];
+      history.unshift(query);
+      if (history.length > 10) history.pop();
+      localStorage.setItem("searchHistory", JSON.stringify(history));
+      showHistory();
+    }
+
+    function showHistory() {
+      const history = JSON.parse(localStorage.getItem("searchHistory")) || [];
+      const list = document.getElementById("historyList");
+      list.innerHTML = "";
+      if (history.length === 0) {
+        list.innerHTML = "<li><em>No search history.</em></li>";
+      }
+      history.forEach(q => {
+        const li = document.createElement("li");
+        li.textContent = q;
+        list.appendChild(li);
+      });
+    }
+
+    function clearHistory() {
+      localStorage.removeItem("searchHistory");
+      showHistory();
+    }
+
+    async function refineQueryWithGPT(query) {
+      if (!openAiKey) return query;
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openAiKey}`
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: "Refine this user query into a precise web search format" },
+            { role: "user", content: query }
+          ]
+        })
+      });
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content || query;
+    }
+
+    async function search() {
+      let query = document.getElementById("queryInput").value;
+      if (!query.trim()) return;
+
+      saveToHistory(query);
+      query = await refineQueryWithGPT(query);
+
+      const category = document.getElementById("categorySelect").value;
+      const searchQuery = category ? `${query} ${category}` : query;
+
+      const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(searchQuery)}&format=json&no_redirect=1`);
+      const data = await response.json();
+
+      const resultDiv = document.getElementById("results");
+      resultDiv.innerHTML = `<h3>🔗 Results for: ${query}</h3>`;
+
+      if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+        data.RelatedTopics.forEach(item => {
+          if (item.Text && item.FirstURL) {
+            const link = document.createElement("a");
+            link.href = item.FirstURL;
+            link.textContent = item.Text;
+            link.target = "_blank";
+            resultDiv.appendChild(link);
+          }
+        });
+      } else {
+        resultDiv.innerHTML += "<p>No results found.</p>";
+      }
+    }
+
+    async function searchImages() {
+      const query = document.getElementById("queryInput").value;
+      if (!query.trim()) return;
+
+      const imageDiv = document.getElementById("imageResults");
+      imageDiv.innerHTML = `<h3>🖼️ Image Results for: \"${query}\"</h3>`;
+
+      const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=12&client_id=${unsplashAccessKey}`);
+      const data = await response.json();
+
+      if (data.results.length === 0) {
+        imageDiv.innerHTML += "<p>No images found.</p>";
+        return;
+      }
+
+      const grid = document.createElement("div");
+      grid.style.display = "grid";
+      grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(150px, 1fr))";
+      grid.style.gap = "10px";
+
+      data.results.forEach(photo => {
+        const img = document.createElement("img");
+        img.src = photo.urls.thumb;
+        img.alt = photo.alt_description || "Image";
+        img.title = photo.description || "";
+        img.style.width = "100%";
+        img.style.borderRadius = "6px";
+        img.style.cursor = "pointer";
+        img.onclick = () => {
+          window.open(photo.links.html, '_blank');
+        };
+        grid.appendChild(img);
+      });
+
+      imageDiv.appendChild(grid);
+    }
+
+    function startVoice() {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert("Voice search is not supported in this browser.");
+        return;
+      }
+
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.start();
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("queryInput").value = transcript;
+        search();
+      };
+
+      recognition.onerror = function(event) {
+        alert("Voice recognition error: " + event.error);
+      };
+    }
+  </script>
+</body>
+</html>
